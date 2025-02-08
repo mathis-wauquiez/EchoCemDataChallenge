@@ -15,10 +15,11 @@ from pathlib import Path
 from functools import lru_cache
 import threading
 from collections import OrderedDict
+import random
 
 # Mean: -0.2745382931759886, std: 28.8
 default_transform = transforms.Compose([
-    transforms.Normalize(mean=[-0.2745], std=[28.8])
+    transforms.Normalize(mean=[-0.2745], std=[28.8]),
 ])
 
 def filter_list(list, fnc):
@@ -131,8 +132,12 @@ class CemDataset(Dataset):
         # Add channel dimension if needed
         if image.ndim == 2:
             image = image.unsqueeze(0)
-        if annotation is not None and annotation.ndim == 2:
-            annotation = annotation.unsqueeze(0)
+
+        # Apply random vertical flip
+        if random.random() < 0.5:
+            image = torch.flip(image, dims=[2])
+            if annotation is not None:
+                annotation = torch.flip(annotation, dims=[1])
 
         # Apply random crop
         if self.crop_size is not None:

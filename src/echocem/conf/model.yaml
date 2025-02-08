@@ -3,6 +3,49 @@ model:
   in_channels: 1
   n_classes: 3
   base_channels: 32
-  depth: 4
-  attention_levels: [false, false, true]
+  depth: 5
+  attention_levels: [false, false, true, true]
   device: cuda
+
+# loss:
+#   _target_: echocem.models.losses.MultiClassDiceLoss
+#   smooth: 1.0
+
+loss:
+  _target_: echocem.models.losses.CombinedLoss
+  losses:
+    - _target_: echocem.models.losses.MultiClassDiceLoss
+      smooth: 1e-1
+    - _target_: echocem.models.losses.LovaszSoftmax
+      reduction: mean
+  lambdas: [1.0, 1.0]
+
+optimizer:
+  target: torch.optim.Adam # two underscores to avoid direct instantiation
+  lr: 1e-3
+  weight_decay: 1e-5
+
+scheduler:
+  target: torch.optim.lr_scheduler.StepLR
+  step_size: 10
+  gamma: 0.1
+
+# Define the model trainer
+segmModel:
+  _target_: echocem.models.trainer.SegmTrainer
+  model: ${model}
+  loss_fn: ${loss}
+  optimizer_cfg: ${optimizer}
+  scheduler_cfg: ${scheduler}
+  metrics:
+    iou:
+      _target_: torchmetrics.JaccardIndex
+      task: multiclass
+      num_classes: 3
+    dice:
+      _target_: torchmetrics.Dice
+      num_classes: 3
+      average: macro
+    pixel_acc:
+      _target_: torchmetrics.classification.MulticlassAccuracy
+      num_classes: 3

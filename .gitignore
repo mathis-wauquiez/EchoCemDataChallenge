@@ -167,3 +167,4 @@ cython_debug/
 # Hydra 
 outputs/
 mlruns/
+/wandb

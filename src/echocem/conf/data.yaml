@@ -1,7 +1,7 @@
 
-training_dataloader:
+train_dataloader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 128
+  batch_size: 32
   shuffle: True
   pin_memory: True
   num_workers: 8
@@ -19,7 +19,7 @@ training_dataloader:
   
 validation_dataloader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 128
+  batch_size: 32
   shuffle: True
   pin_memory: True
   num_workers: 8
