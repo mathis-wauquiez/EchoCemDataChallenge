@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .layers import ConvBlock, UpConvBlock, AttentionBlock
+from layers import ConvBlock, UpConvBlock, AttentionBlock
 
 
 # Adapted from https://www.kaggle.com/code/truthisneverlinear/attention-u-net-pytorch
@@ -18,10 +18,9 @@ class AttentionUNet(nn.Module):
                                         attention at each decoder level. If None, use
                                         attention at all levels.
     """
-    def __init__(self, channels, n_classes=1, attention_levels=None, device=None):
+    def __init__(self, channels, n_classes=1, attention_levels=None):
         super().__init__()
-        self.device = device
-
+        
         if len(channels) < 3:
             raise ValueError("channels list must have at least 3 elements (in, hidden, out)")
             
@@ -106,7 +105,7 @@ class AttentionUNet(nn.Module):
         return self.conv_1x1(x)
 
 # Example usage:
-def create_attention_unet(in_channels=1, n_classes=1, base_channels=64, depth=5, attention_levels=None, device=None):
+def create_attention_unet(in_channels=1, n_classes=1, base_channels=64, depth=5, attention_levels=None):
     """
     Helper function to create an AttentionUNet with specified parameters.
     
@@ -121,15 +120,11 @@ def create_attention_unet(in_channels=1, n_classes=1, base_channels=64, depth=5,
     for i in range(depth):
         channels.append(base_channels * (2**i))
     
-    if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     return AttentionUNet(
         channels=channels,
         n_classes=n_classes,
-        attention_levels=attention_levels,
-        device=device
-    ).to(device)
+        attention_levels=attention_levels
+    )
 
 
 def load_model(path_checkpoint, modelClass: torch.nn.Module, **kwargs):
