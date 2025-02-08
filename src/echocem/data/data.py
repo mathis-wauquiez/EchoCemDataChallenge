@@ -39,6 +39,7 @@ class CemDataset(Dataset):
                  crop_size=(256, 272), 
                  excluded_wells=[],
                  preload_data=True,
+                 file_format='processed',
                  cache_size=100):
         
         self.images_path = images_path
@@ -49,12 +50,26 @@ class CemDataset(Dataset):
         self.cache_size = cache_size
         
         # Pre-filter and sort image paths
-        self.images = sorted([f for f in os.listdir(images_path) 
-                            if int(f.split('_')[0]) not in excluded_wells])
+        if len(excluded_wells) > 0:
+            if file_format == 'processed':
+                self.images = sorted([f for f in os.listdir(images_path) 
+                                if int(f.split('_')[0]) not in excluded_wells])
+            else:
+                    self.images = sorted([f for f in os.listdir(images_path)
+                                            if int(f.split('_')[1]) not in excluded_wells])
+        else:
+            self.images = sorted([f for f in os.listdir(images_path)])
         
         if self.annotations_path:
-            self.annotations = sorted([f for f in os.listdir(annotations_path) 
-                                    if int(f.split('_')[0]) not in excluded_wells])
+            if len(excluded_wells) > 0:
+                if file_format == 'processed':
+                    self.annotations = sorted([f for f in os.listdir(annotations_path) 
+                                            if int(f.split('_')[0]) not in excluded_wells])
+                else:
+                        self.annotations = sorted([f for f in os.listdir(annotations_path)
+                                                if int(f.split('_')[1]) not in excluded_wells])
+            else:
+                self.annotations = sorted([f for f in os.listdir(annotations_path)])
             if len(self.images) != len(self.annotations):
                 raise ValueError("Number of images and annotations must be equal.")
         else:
@@ -120,10 +135,11 @@ class CemDataset(Dataset):
             annotation = annotation.unsqueeze(0)
 
         # Apply random crop
-        i, j, h, w = T.RandomCrop.get_params(image, output_size=self.crop_size)
-        image = F.crop(image, i, j, h, w)
-        if annotation is not None:
-            annotation = F.crop(annotation, i, j, h, w)
+        if self.crop_size is not None:
+            i, j, h, w = T.RandomCrop.get_params(image, output_size=self.crop_size)
+            image = F.crop(image, i, j, h, w)
+            if annotation is not None:
+                annotation = F.crop(annotation, i, j, h, w)
 
         # Apply transforms
         if self.transform:

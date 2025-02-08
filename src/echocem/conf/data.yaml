@@ -1,5 +1,5 @@
 
-dataloader:
+training_dataloader:
   _target_: torch.utils.data.DataLoader
   batch_size: 128
   shuffle: True
@@ -12,5 +12,24 @@ dataloader:
     annotations_path: data/processed/X_train/annotations
     crop_size: [256, 272]
     excluded_wells: [3, 4]
+    file_format: 'processed'
+    preload_data: True
+    cache_size: 1000
+
+  
+validation_dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 128
+  shuffle: True
+  pin_memory: True
+  num_workers: 8
+
+  dataset:
+    _target_: echocem.data.data.CemDataset
+    images_path: data/raw/X_train/images
+    annotations_path: data/raw/X_train/patch_annotations
+    crop_size: null
+    excluded_wells: [3, 4]
+    file_format: 'raw'
     preload_data: True
     cache_size: 1000
