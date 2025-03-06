@@ -120,7 +120,6 @@ class CemDataset(Dataset):
         # Apply transforms
         if self.transform:
             image = self.transform(image)
-        print(image.shape) # Should be (C, H, W)
 
         annotation = torch.from_numpy(annotation).long() if annotation is not None else None
         return (image, annotation) if annotation is not None else image
