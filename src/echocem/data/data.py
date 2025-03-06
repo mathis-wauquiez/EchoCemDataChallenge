@@ -19,7 +19,6 @@ import random
 
 # Mean: -0.2745382931759886, std: 28.8
 default_transform = transforms.Compose([
-    transforms.ToTensor(),
     transforms.Normalize(mean=[-0.2745], std=[28.8]),
 ])
 
@@ -107,6 +106,7 @@ class CemDataset(Dataset):
         # Add channel dimension
         if image.ndim == 2:
             image = image[np.newaxis, :, :]
+
         
 
         # Apply random vertical flip
@@ -115,12 +115,13 @@ class CemDataset(Dataset):
             if annotation is not None:
                 annotation = np.flip(annotation, axis=0).copy() # raison du .copy(): https://discuss.pytorch.org/t/negative-strides-in-tensor-error/134287/2
         
-        image = image.astype(np.float32)
+        image = torch.from_numpy(image).float()
 
         # Apply transforms
         if self.transform:
             image = self.transform(image)
-        
+        print(image.shape) # Should be (C, H, W)
+
         annotation = torch.from_numpy(annotation).long() if annotation is not None else None
         return (image, annotation) if annotation is not None else image
 
