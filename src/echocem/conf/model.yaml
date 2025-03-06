@@ -2,14 +2,15 @@ model:
   _target_: echocem.models.models.create_attention_unet
   in_channels: 1
   n_classes: 3
-  base_channels: 32
+  base_channels: 16
   depth: 5
-  attention_levels: [false, false, true, true]
+  attention_levels: [false, false, false, false]
   device: cuda
 
-# loss:
-#   _target_: echocem.models.losses.MultiClassDiceLoss
-#   smooth: 1.0
+# model:
+#   _target_: echocem.models.foundation_models.Dinov2
+#   num_classes: 3
+#   model: dinov2_vits14
 
 loss:
   _target_: echocem.models.losses.CombinedLoss
