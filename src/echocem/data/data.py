@@ -19,138 +19,120 @@ import random
 
 # Mean: -0.2745382931759886, std: 28.8
 default_transform = transforms.Compose([
+    transforms.ToTensor(),
     transforms.Normalize(mean=[-0.2745], std=[28.8]),
 ])
 
 def filter_list(list, fnc):
     return [item for item in list if fnc(item)]
 
+
 class CemDataset(Dataset):
-    """
-    Optimized dataset class for loading ultrasound images and annotations.
-    - Caching of loaded images
-    - Precomputation of valid indices
-    - Memory-efficient preprocessing
-    - Optional preloading of all data
-    """
-    def __init__(self, 
-                 images_path, 
-                 annotations_path=None, 
-                 transform=default_transform, 
-                 crop_size=(256, 272), 
+
+    def __init__(self,
+                 images_path,
+                 annotations_path=None,
+                 transform=default_transform,
+                 crop_size=(272, 272),
                  excluded_wells=[],
-                 preload_data=True,
-                 file_format='processed',
-                 cache_size=100):
+                 file_format='processed'
+    ):
         
         self.images_path = images_path
         self.annotations_path = annotations_path
         self.transform = transform
         self.crop_size = crop_size
-        self.preload_data = preload_data
-        self.cache_size = cache_size
+        self.excluded_wells = excluded_wells
+        self.file_format = file_format
         
-        # Pre-filter and sort image paths
-        if len(excluded_wells) > 0:
-            if file_format == 'processed':
-                self.images = sorted([f for f in os.listdir(images_path) 
-                                if int(f.split('_')[0]) not in excluded_wells])
-            else:
-                    self.images = sorted([f for f in os.listdir(images_path)
-                                            if int(f.split('_')[1]) not in excluded_wells])
-        else:
-            self.images = sorted([f for f in os.listdir(images_path)])
-        
+        # Loading the files
+
+        # 'well_n_section_m_patch_l.npy' for raw files / 'n_m' for processed files
+        well_idx = 0 if file_format == 'processed' else 1
+
+
+        # Load the sensor images
+        self.images_paths = sorted([f for f in os.listdir(images_path) 
+                        if int(f.split('_')[well_idx]) not in excluded_wells])
+        self.images_npy = [np.load(os.path.join(images_path, f)) for f in self.images_paths]
+
+
+        # Load the annotations
         if self.annotations_path:
-            if len(excluded_wells) > 0:
-                if file_format == 'processed':
-                    self.annotations = sorted([f for f in os.listdir(annotations_path) 
-                                            if int(f.split('_')[0]) not in excluded_wells])
-                else:
-                        self.annotations = sorted([f for f in os.listdir(annotations_path)
-                                                if int(f.split('_')[1]) not in excluded_wells])
-            else:
-                self.annotations = sorted([f for f in os.listdir(annotations_path)])
-            if len(self.images) != len(self.annotations):
+
+            self.annotations_paths = sorted([f for f in os.listdir(annotations_path) 
+                                    if int(f.split('_')[well_idx]) not in excluded_wells])
+            
+            self.annotations_npy = [np.load(os.path.join(annotations_path, f)) for f in self.annotations_paths]
+
+            if len(self.images_paths) != len(self.annotations_paths):
                 raise ValueError("Number of images and annotations must be equal.")
+            
         else:
-            self.annotations = None
-            
-        if len(self.images) == 0:
-            raise ValueError("No images found.")
-            
-        # Initialize cache as OrderedDict for FIFO behavior
-        self.cache = OrderedDict()
-        
-        # Preload data if requested
-        if self.preload_data:
-            print("Preloading data into memory...")
-            self._preload_data()
+            self.annotations_paths = None
 
-    def _preload_data(self):
-        """Preload all data into memory"""
-        for idx in range(len(self.images)):
-            image_path = os.path.join(self.images_path, self.images[idx])
-            self.cache[idx] = {
-                'image': torch.from_numpy(np.load(image_path)).float()
-            }
-            
-            if self.annotations_path:
-                annotation_path = os.path.join(self.annotations_path, self.annotations[idx])
-                self.cache[idx]['annotation'] = torch.from_numpy(np.load(annotation_path)).long()
-
-    def _load_item(self, idx):
-        """Load and cache a single item"""
-        if idx in self.cache:
-            return self.cache[idx]
-        
-        image_path = os.path.join(self.images_path, self.images[idx])
-        item = {
-            'image': torch.from_numpy(np.load(image_path)).float()
-        }
-        
-        if self.annotations_path:
-            annotation_path = os.path.join(self.annotations_path, self.annotations[idx])
-            item['annotation'] = torch.from_numpy(np.load(annotation_path)).long()
-            
-        # Manage cache size using FIFO
-        if len(self.cache) >= self.cache_size:
-            self.cache.popitem(last=False)  # Remove oldest item
-        self.cache[idx] = item
-            
-        return item
-
+    def get_number_of_crops(self, image_height):
+        # Return the number of crops that can be extracted from the image
+        return image_height - self.crop_size[0] + 1 if self.crop_size is not None else 1
+    
     def __len__(self):
-        return len(self.images)
-
+        # Number of crops in all images
+        return sum([self.get_number_of_crops(image.shape[0]) for image in self.images_npy]) if self.crop_size is not None else len(self.images_npy)
+    
     def __getitem__(self, idx):
-        # Load data (either from cache or disk)
-        item = self._load_item(idx) if not self.preload_data else self.cache[idx]
-        image = item['image']
-        annotation = item.get('annotation', None)
-
-        # Add channel dimension if needed
+        # Get the image index and the crop index
+        if self.crop_size is None:
+            image_idx = idx
+            idx = 0
+        
+        else:
+            image_idx = 0
+            for image in self.images_npy:
+                number_of_crops = self.get_number_of_crops(image.shape[0])
+                if idx < number_of_crops:
+                    break
+                idx -= number_of_crops
+                image_idx += 1
+        
+        # Choose the right image and annotation
+        image = self.images_npy[image_idx]
+        annotation = self.annotations_npy[image_idx] if self.annotations_paths else None
+        
+        # Crop the image
+        if self.crop_size is not None:
+            image = image[idx:idx+self.crop_size[0], :]
+            if annotation is not None:
+                annotation = annotation[idx:idx+self.crop_size[0], :]
+        
+        # Add channel dimension
         if image.ndim == 2:
-            image = image.unsqueeze(0)
+            image = image[np.newaxis, :, :]
+        
 
         # Apply random vertical flip
         if random.random() < 0.5:
-            image = torch.flip(image, dims=[2])
+            image = np.flip(image, axis=1).copy()
             if annotation is not None:
-                annotation = torch.flip(annotation, dims=[1])
-
-        # Apply random crop
-        if self.crop_size is not None:
-            i, j, h, w = T.RandomCrop.get_params(image, output_size=self.crop_size)
-            image = F.crop(image, i, j, h, w)
-            if annotation is not None:
-                annotation = F.crop(annotation, i, j, h, w)
+                annotation = np.flip(annotation, axis=0).copy() # raison du .copy(): https://discuss.pytorch.org/t/negative-strides-in-tensor-error/134287/2
+        
+        image = image.astype(np.float32)
 
         # Apply transforms
         if self.transform:
             image = self.transform(image)
-
+        
+        annotation = torch.from_numpy(annotation).long() if annotation is not None else None
         return (image, annotation) if annotation is not None else image
+
+    def __reduce__(self):
+        """
+        Pickling method for the dataset. (required for multiprocessing with DataLoader)
+        """
+        # Return a tuple of class, constructor arguments, and additional state
+        return (self.__class__, 
+                (self.images_path, self.annotations_path, self.transform, 
+                 self.crop_size, self.excluded_wells, self.file_format), 
+                {})
 
 
 if __name__ == "__main__":
