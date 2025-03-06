@@ -1,10 +1,11 @@
 
 train_dataloader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 64
+  batch_size: 128
   shuffle: True
   pin_memory: True
   num_workers: 4
+  persistent_workers: true
 
   dataset:
     _target_: echocem.data.data.CemDataset
@@ -17,10 +18,11 @@ train_dataloader:
   
 validation_dataloader:
   _target_: torch.utils.data.DataLoader
-  batch_size: 32
+  batch_size: 64
   shuffle: False
   pin_memory: True
   num_workers: 2
+  persistent_workers: true
 
   # validation is based on the raw data (je me souviens plus pourquoi)
   dataset:

@@ -2,7 +2,7 @@ model:
   _target_: echocem.models.models.create_attention_unet
   in_channels: 1
   n_classes: 3
-  base_channels: 16
+  base_channels: 32
   depth: 5
   attention_levels: [false, false, false, false]
   device: cuda
@@ -43,10 +43,27 @@ segmModel:
       _target_: torchmetrics.JaccardIndex
       task: multiclass
       num_classes: 3
+
     dice:
       _target_: torchmetrics.Dice
       num_classes: 3
       average: macro
+
     pixel_acc:
       _target_: torchmetrics.classification.MulticlassAccuracy
       num_classes: 3
+
+    class_0_acc:
+      _target_: echocem.models.metrics.PerClassAccuracy  # Assuming you place the class in this module
+      num_classes: 3
+      class_id: 0
+
+    class_1_acc:
+      _target_: echocem.models.metrics.PerClassAccuracy
+      num_classes: 3
+      class_id: 1
+
+    class_2_acc:
+      _target_: echocem.models.metrics.PerClassAccuracy
+      num_classes: 3
+      class_id: 2
